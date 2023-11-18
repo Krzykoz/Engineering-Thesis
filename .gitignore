@@ -1,0 +1,14 @@
+# Ignore all build folders
+**/build/*
+
+# Ignore all txt files
+*.txt
+
+# Ignore all csv files
+*.csv
+
+# Ignore all bmp files
+*.bmp
+
+# Ignore all .DS_Store files
+.DS_Store
