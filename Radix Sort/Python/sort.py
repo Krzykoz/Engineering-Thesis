@@ -1,7 +1,6 @@
 import time
 
 def radix_sort(arr):
-    # Find the maximum number to determine the number of digits
     max_num = max(arr)
     exp = 1
 
@@ -14,16 +13,13 @@ def counting_sort(arr, exp):
     output = [0] * n
     count = [0] * 10
 
-    # Count occurrences of each digit at the current place
     for i in range(n):
         index = arr[i] // exp
         count[index % 10] += 1
 
-    # Update count[i] to store the position of the next occurrence
     for i in range(1, 10):
         count[i] += count[i - 1]
 
-    # Build the output array
     i = n - 1
     while i >= 0:
         index = arr[i] // exp
@@ -31,7 +27,6 @@ def counting_sort(arr, exp):
         count[index % 10] -= 1
         i -= 1
 
-    # Copy the output array to arr, so that arr now contains sorted numbers
     for i in range(n):
         arr[i] = output[i]
 
@@ -57,7 +52,7 @@ with open('radix_sort_data.csv', 'w') as file:
     file_path = '../numbers.txt'
     big_numbers_list = read_numbers_from_file(file_path)
 
-    for i in range(1, 8):
+    for i in range(4, 9):
         num_elements = 10 ** i
         numbers_list = big_numbers_list[:num_elements]
         sort(num_elements, numbers_list, file)

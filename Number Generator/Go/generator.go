@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"strconv"
@@ -51,7 +52,7 @@ func main() {
 	logFile.WriteString("Numbers,Time\n")
 
 	for i := 1; i < 9; i++ {
-		numbersGenerated := int(1e6) * i
+		numbersGenerated := int(math.Pow(10, float64(i)))
 		filePath := fmt.Sprintf("numbers%d.txt", numbersGenerated)
 		generate(filePath, numbersGenerated, logFile)
 	}

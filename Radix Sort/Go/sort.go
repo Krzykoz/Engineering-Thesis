@@ -105,7 +105,7 @@ func main() {
 	filePath := "../numbers.txt"
 	bigNumbersList := readNumbersFromFile(filePath)
 
-	for i := 1; i < 8; i++ {
+	for i := 4; i < 9; i++ {
 		numElements := int(math.Pow10(i))
 		numbersList := bigNumbersList[:numElements]
 		sort(numElements, numbersList, file)

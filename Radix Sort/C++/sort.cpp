@@ -73,10 +73,10 @@ int main() {
     std::ofstream file("../radix_sort_data.csv");
     file << "Limit,Time\n";
 
-    std::string file_path = "../../numbers.txt";
+    std::string file_path = "../numbers.txt";
     std::vector<int> big_numbers_list = read_numbers_from_file(file_path);
 
-    for (int i = 1; i < 8; ++i) {
+    for (int i = 4; i < 9; ++i) {
         int num_elements = static_cast<int>(pow(10, i));
         std::vector<int> numbers_list(big_numbers_list.begin(), big_numbers_list.begin() + num_elements);
         sort(num_elements, numbers_list, file);

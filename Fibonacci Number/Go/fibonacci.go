@@ -42,7 +42,7 @@ func main() {
 
 	file.WriteString("Sequence Number,Time\n")
 
-	for i := 1; i <= 40; i++ {
+	for i := 30; i <= 45; i++ {
 		calculateFibonacciNumber(i, file)
 	}
 }

@@ -43,8 +43,8 @@ int main() {
     std::ofstream file("prime_numbers_data.csv");
     file << "Limit,Time\n";
 
-    for (int i = 1; i <= 25; ++i) {
-        prime_numbers(static_cast<int>(std::pow(2, i)), file);
+    for (int i = 1; i < 9; ++i) {
+        prime_numbers(static_cast<int>(std::pow(10, i)), file);
     }
 
     return 0;

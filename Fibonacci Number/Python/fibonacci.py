@@ -26,5 +26,5 @@ def calculateFibonacciNumber(n, file):
 with open('fibonacci_data.csv', 'w') as file:
     file.write("Sequence Number,Time\n")
 
-    for i in range(1, 41):
+    for i in range(30, 46):
         calculateFibonacciNumber(i, file)

@@ -52,7 +52,7 @@ func main() {
 
 	file.WriteString("Limit,Time\n")
 
-	for i := 1; i <= 25; i++ {
-		primeNumbers(int(math.Pow(2, float64(i))), file)
+	for i := 1; i < 9; i++ {
+		primeNumbers(int(math.Pow(10, float64(i))), file)
 	}
 }

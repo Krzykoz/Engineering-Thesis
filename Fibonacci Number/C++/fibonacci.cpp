@@ -35,7 +35,7 @@ int main() {
     ofstream file("fibonacci_data.csv");
     file << "Sequence Number,Time\n";
 
-    for (int i = 1; i <= 40; i++) {
+    for (int i = 30; i <= 45; i++) {
         calculateFibonacciNumber(i, file);
     }
 

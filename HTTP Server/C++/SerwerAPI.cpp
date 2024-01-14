@@ -1,171 +1,129 @@
-#include <cpprest/http_listener.h>
-#include <cpprest/json.h>
-#include <cpprest/uri.h>
-#include <cpprest/asyncrt_utils.h>
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+#include <boost/beast/version.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/io_context.hpp>
+#include <boost/json.hpp>
 #include <iostream>
 #include <fstream>
-#include <chrono>
-#include <ctime>
-#include <iomanip>
 #include <sstream>
+#include <ctime>
 
-using namespace web;
-using namespace web::http;
-using namespace web::http::experimental::listener;
+namespace beast = boost::beast;         // from <boost/beast.hpp>
+namespace http = beast::http;           // from <boost/beast/http.hpp>
+namespace net = boost::asio;            // from <boost/asio.hpp>
+namespace json = boost::json;
+using tcp = net::ip::tcp;               // from <boost/asio/ip/tcp.hpp>
 
-class LogFileReader {
+class LogFileHandler {
 public:
-    LogFileReader(const std::string& log_file) : log_file(log_file) {}
+    LogFileHandler(const std::string& file) : logFile(file) {}
 
-    int read_response_count() {
-        try {
-            std::ifstream file(log_file);
-            if (!file)
-                throw std::runtime_error(log_file + " file not found");
-
-            int line_count = 0;
-            std::string line;
-            while (std::getline(file, line)) {
-                if (!is_valid_line(line)) {
-                    reset_counter_and_clear_file();
-                    std::cout << "Invalid line found in log.txt. Resetting the counter and clearing the file." << std::endl;
-                    return 0;
-                }
-                line_count++;
-            }
-
-            std::cout << "Successfully read response count from log.txt" << std::endl;
-            std::cout << "Response Count is set to: " << line_count << std::endl;
-            return line_count;
-        }
-        catch (const std::exception& ex) {
-            std::cout << ex.what() << std::endl;
+    int readResponseCount() {
+        std::ifstream file(logFile);
+        if (!file.is_open()) {
+            std::cerr << logFile << " file not found\n";
             return 0;
         }
-    }
 
-private:
-    bool is_valid_line(const std::string& line) const {
-        // Checking the validity of the line (customize according to your own structure)
-        // Example: "IP Address: [ip_address], Date: [date], Time: [time]\n"
-        return line.rfind("IP Address:", 0) == 0 &&
-            std::count(line.begin(), line.end(), ',') == 2 &&
-            line.find(", Date:") != std::string::npos &&
-            line.find(", Time:") != std::string::npos;
-    }
-
-    void reset_counter_and_clear_file() {
-        std::ofstream file(log_file, std::ofstream::trunc);
-    }
-
-private:
-    std::string log_file;
-};
-
-class LogFileWriter {
-public:
-    LogFileWriter(const std::string& log_file) : log_file(log_file) {}
-
-    void write_to_file(const std::string& ip_address, const std::string& now) {
-        std::ofstream file(log_file, std::ofstream::app);
-        if (file) {
-            file << "IP Address: " << ip_address << ", Date: " << now.substr(0, 10) << ", Time: " << now.substr(11) << "\n";
+        int lineCount = 0;
+        std::string line;
+        while (getline(file, line)) {
+            if (!isValidLine(line)) {
+                resetCounterAndClearFile();
+                std::cerr << "Invalid line found. Resetting counter and clearing file.\n";
+                return 0;
+            }
+            ++lineCount;
         }
+        return lineCount;
+    }
+
+    void writeToLogFile(const std::string& ipAddress) {
+        std::ofstream file(logFile, std::ios::app);
+        if (!file.is_open()) {
+            std::cerr << "Error opening file for writing.\n";
+            return;
+        }
+
+        // Get current time
+        auto t = std::time(nullptr);
+        auto tm = *std::localtime(&t);
+
+        file << "IP Address: " << ipAddress << ", Date: ";
+        file << std::put_time(&tm, "%Y-%m-%d") << ", Time: ";
+        file << std::put_time(&tm, "%H:%M:%S") << std::endl;
     }
 
 private:
-    std::string log_file;
+    std::string logFile;
+
+    bool isValidLine(const std::string& line) {
+        // Implement your validation logic here
+        return true;
+    }
+
+    void resetCounterAndClearFile() {
+        std::ofstream file(logFile, std::ofstream::out | std::ofstream::trunc);
+    }
 };
 
-class ResponseBuilder {
-public:
-    ResponseBuilder(const std::string& ip_address, int response_count) : ip_address(ip_address), response_count(response_count) {}
+std::string createResponse(int responseCount) {
+    json::object obj;
+    auto t = std::time(nullptr);
+    auto tm = *std::localtime(&t);
 
-    web::json::value build_response() {
-        auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        std::stringstream date_stream, time_stream;
-        date_stream << std::put_time(std::localtime(&now), "%Y-%m-%d");
-        time_stream << std::put_time(std::localtime(&now), "%H:%M:%S");
+    std::ostringstream date_stream, time_stream;
+    date_stream << std::put_time(&tm, "%Y-%m-%d");
+    time_stream << std::put_time(&tm, "%H:%M:%S");
 
-        std::string formatted_date = date_stream.str();
-        std::string formatted_time = time_stream.str();
+    obj["date"] = date_stream.str();
+    obj["time"] = time_stream.str();
+    obj["response_count"] = responseCount;
 
-        web::json::value response;
-        response[U("date")] = web::json::value::string(formatted_date);
-        response[U("time")] = web::json::value::string(formatted_time);
-        response[U("response_count")] = web::json::value::number(response_count);
+    return json::serialize(obj);
+}
 
-        std::cout << "Request from IP: " << ip_address << " at " << formatted_date << " " << formatted_time << std::endl;
-        std::cout << "Response: " << response.serialize() << std::endl;
+void handleRequest(tcp::socket& socket, LogFileHandler& logHandler, int& responseCount) {
+    beast::flat_buffer buffer;
 
-        return response;
-    }
+    // Read the request
+    http::request<http::dynamic_body> req;
+    http::read(socket, buffer, req);
 
-private:
-    std::string ip_address;
-    int response_count;
-};
+    // Increment the response count and write to log
+    responseCount++;
+    logHandler.writeToLogFile(socket.remote_endpoint().address().to_string());
 
-class ResponseHandler {
-public:
-    ResponseHandler(const std::string& log_file) : log_file_reader(log_file), log_file_writer(log_file), response_count(log_file_reader.read_response_count()) {}
+    // Create the HTTP response
+    http::response<http::string_body> res{http::status::ok, req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "application/json");
+    res.keep_alive(req.keep_alive());
+    res.body() = createResponse(responseCount);
+    res.prepare_payload();
 
-    web::json::value handle_response(const http::http_request& request) {
-        std::string ip_address = utility::conversions::to_utf8string(request.remote_address());
-
-        increment_count();
-        log_file_writer.write_to_file(ip_address, current_time());
-
-        ResponseBuilder response_builder(ip_address, get_count());
-        web::json::value response = response_builder.build_response();
-
-        return response;
-    }
-
-private:
-    void increment_count() {
-        response_count++;
-    }
-
-    int get_count() const {
-        return response_count;
-    }
-
-    std::string current_time() const {
-        auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        std::stringstream stream;
-        stream << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S");
-        return stream.str();
-    }
-
-private:
-    LogFileReader log_file_reader;
-    LogFileWriter log_file_writer;
-    int response_count;
-};
+    // Write the response back to the client
+    http::write(socket, res);
+}
 
 int main() {
-    utility::string_t host_uri = U("http://localhost:8080");
-    http_listener listener(host_uri);
-
-    std::string log_file = "log.txt";
-    ResponseHandler response_handler(log_file);
-
-    listener.support(methods::GET, [&](http_request request) {
-        web::json::value response = response_handler.handle_response(request);
-
-        request.reply(status_codes::OK, response);
-    });
-
     try {
-        listener.open().wait();
-        std::cout << "Server listening on " << host_uri << std::endl;
-        std::cout << "Press Enter to exit..." << std::endl;
-        std::cin.ignore();
-        listener.close().wait();
-    }
-    catch (const std::exception& ex) {
-        std::cout << "Error: " << ex.what() << std::endl;
+        net::io_context ioc{1};
+
+        tcp::acceptor acceptor{ioc, {net::ip::make_address("127.0.0.1"), 8080}};
+        LogFileHandler logHandler("log.txt");
+        int responseCount = logHandler.readResponseCount();
+
+        while (true) {
+            tcp::socket socket{ioc};
+            acceptor.accept(socket);
+
+            handleRequest(socket, logHandler, responseCount);
+        }
+    } catch (std::exception const& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
     }
 
     return 0;

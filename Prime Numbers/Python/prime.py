@@ -20,5 +20,5 @@ def prime_numbers(limit, file):
 with open('prime_numbers_data.csv', 'w') as file:
     file.write("Limit,Time\n")
 
-    for i in range(1, 26):
-        prime_numbers(pow(2,i), file)
+    for i in range(1, 9):
+        prime_numbers(10**i, file)
